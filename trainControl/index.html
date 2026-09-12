@@ -217,7 +217,8 @@ input[type=range]::-moz-range-thumb{
     <button class="ghost" id="power">Apagar el tren</button>
   </section>
 
-  <div style="text-align:center;font-size:.7rem;opacity:.4;margin-top:4px;">v002</div>
+  <div id="debugLog" style="font-family:monospace;font-size:.65rem;line-height:1.3;white-space:pre-wrap;max-height:160px;overflow-y:auto;background:rgba(0,0,0,.25);border-radius:8px;padding:6px 8px;margin-top:8px;opacity:.85;"></div>
+  <div style="text-align:center;font-size:.7rem;opacity:.4;margin-top:4px;">v003</div>
 </main>
 
 <script>
@@ -235,6 +236,20 @@ input[type=range]::-moz-range-thumb{
   const intro = $("intro"), controls = $("controls");
   const throttle = $("throttle"), speedNum = $("speedNum");
   const chevL = $("chevL"), chevR = $("chevR"), dirLabel = $("dirLabel");
+  const debugLog = $("debugLog");
+
+  // ---------- panel de depuración temporal ----------
+  function toHex(bytes){
+    return Array.from(bytes).map(b => b.toString(16).padStart(2,"0")).join(" ");
+  }
+  function logDebug(line){
+    if (!debugLog) return;
+    const t = new Date().toLocaleTimeString();
+    debugLog.textContent += `[${t}] ${line}\n`;
+    const lines = debugLog.textContent.split("\n");
+    if (lines.length > 200) debugLog.textContent = lines.slice(-200).join("\n");
+    debugLog.scrollTop = debugLog.scrollHeight;
+  }
 
   let device = null, characteristic = null, wakeLock = null;
   let chain = Promise.resolve();
@@ -271,10 +286,11 @@ input[type=range]::-moz-range-thumb{
   function write(bytes){
     if (!characteristic) return Promise.resolve();
     const data = new Uint8Array(bytes);
+    logDebug("TX " + toHex(data));
     chain = chain.then(() => characteristic.writeValueWithoutResponse
         ? characteristic.writeValueWithoutResponse(data)
         : characteristic.writeValue(data))
-      .catch(err => { console.warn("Envío fallido:", err); });
+      .catch(err => { console.warn("Envío fallido:", err); logDebug("TX ERROR: " + err); });
     return chain;
   }
 
@@ -355,6 +371,7 @@ input[type=range]::-moz-range-thumb{
 
   function onMessage(ev){
     const d = new Uint8Array(ev.target.value.buffer);
+    logDebug("RX " + toHex(d));
     if (d.length >= 6 && d[2] === 0x01 && d[3] === 0x06 && d[4] === 0x06){
       const pct = d[5];
       battery.textContent = pct + "%";
