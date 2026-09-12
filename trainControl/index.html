@@ -277,7 +277,12 @@ input[type=range]::-moz-range-thumb{
   }
 
   const motor = speed => write([0x08,0x00,0x81,P_MOTOR,0x11,0x51,0x00, speed & 0xff]);
-  const sound = id    => write([0x08,0x00,0x81,P_SOUND,0x11,0x51,0x01, id & 0xff]);
+  // El altavoz necesita activar primero el modo SONIDO (Port Input Format Setup, 0x41)
+  // antes de que el WriteDirectModeData (0x51) surta efecto; motor y luz ya usan su modo por defecto.
+  const sound = id    => {
+    write([0x0A,0x00,0x41,P_SOUND,0x01,0x01,0x00,0x00,0x00,0x01]); // activa el modo SONIDO
+    return write([0x08,0x00,0x81,P_SOUND,0x11,0x51,0x01, id & 0xff]); // reproduce el sonido
+  };
   const light = col   => write([0x08,0x00,0x81,P_LIGHT,0x11,0x51,0x00, col & 0xff]);
 
   // limita la frecuencia pero garantiza que el último valor siempre llega
