@@ -1,1 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1F4E5F">
+<title>Mando del tren Duplo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --panel:#1F4E5F;
+  --panel-hi:#2B6779;
+  --panel-lo:#163B48;
+  --ink:#0E2029;
+  --cream:#F4EBD9;
+  --cream-dim:rgba(244,235,217,.60);
+  --cream-faint:rgba(244,235,217,.20);
+  --brass:#E8A82C;
+  --signal:#D23B2E;
+  --signal-lo:#9E2419;
+  --go:#5CC084;
+  --page:#E5DCCB;
+  --radius:14px;
+  --font:"Bricolage Grotesque","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --page:#0C1B22; }
+}
+:root[data-theme="dark"]{ --page:#0C1B22; }
 
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--font);
+  background:var(--page);
+  color:var(--cream);
+  min-height:100vh;
+  display:flex;justify-content:center;
+  padding:16px 12px calc(16px + env(safe-area-inset-bottom));
+  -webkit-tap-highlight-color:transparent;
+}
+.panel{
+  width:100%;max-width:440px;
+  background:linear-gradient(176deg,var(--panel-hi) 0%,var(--panel) 22%,var(--panel-lo) 100%);
+  border-radius:22px;
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 1px 0 rgba(255,255,255,.14) inset,0 18px 40px rgba(14,32,41,.35);
+  padding:14px 16px 20px;
+  display:flex;flex-direction:column;gap:18px;
+}
+
+/* ---- barra de estado ---- */
+.status{
+  display:flex;align-items:center;gap:10px;
+  font-size:.82rem;font-weight:500;color:var(--cream-dim);
+  border-bottom:1px solid var(--cream-faint);
+  padding-bottom:12px;
+}
+.lamp{width:9px;height:9px;border-radius:50%;background:var(--cream-faint);flex:none;
+  box-shadow:0 0 0 3px rgba(0,0,0,.18) inset}
+.lamp.on{background:var(--go);box-shadow:0 0 9px var(--go)}
+.lamp.busy{background:var(--brass);box-shadow:0 0 9px var(--brass)}
+#statusText{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#battery{font-variant-numeric:tabular-nums;color:var(--cream-dim)}
+#battery.low{color:var(--signal)}
+
+/* ---- pantalla de conexión ---- */
+.intro{display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;padding:26px 6px 14px}
+.intro h1{font-size:1.65rem;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.intro p{font-size:.92rem;color:var(--cream-dim);max-width:30ch;line-height:1.5}
+.big-btn{
+  font-family:var(--font);font-size:1.05rem;font-weight:600;color:var(--ink);
+  background:linear-gradient(180deg,#F3BE4E,var(--brass));
+  border:none;border-radius:var(--radius);
+  padding:16px 30px;cursor:pointer;
+  box-shadow:0 4px 0 #A8761A,0 8px 14px rgba(0,0,0,.25);
+}
+.big-btn:active{transform:translateY(3px);box-shadow:0 1px 0 #A8761A}
+.big-btn:focus-visible,.snd:focus-visible,.sw:focus-visible,#stop:focus-visible,.ghost:focus-visible{
+  outline:3px solid var(--cream);outline-offset:3px}
+
+/* ---- velocímetro ---- */
+.readout{display:flex;align-items:baseline;justify-content:center;gap:14px;padding-top:4px}
+.chev{font-size:1.9rem;font-weight:800;color:var(--cream-faint);line-height:1;transition:color .12s}
+.chev.lit{color:var(--brass)}
+#speedNum{
+  font-size:4.6rem;font-weight:800;line-height:.9;letter-spacing:-.05em;
+  font-variant-numeric:tabular-nums;min-width:3.1ch;text-align:center;
+}
+.caption{text-align:center;font-size:.8rem;color:var(--cream-dim);margin-top:4px}
+
+/* ---- palanca ---- */
+.throttle{position:relative;padding:6px 2px 0}
+.slot{
+  position:absolute;left:2px;right:2px;top:26px;height:18px;border-radius:9px;
+  background:var(--panel-lo);
+  box-shadow:0 2px 4px rgba(0,0,0,.45) inset;
+  pointer-events:none;overflow:hidden;
+}
+.slot::after{ /* zona muerta central */
+  content:"";position:absolute;left:calc(50% - 8%);width:16%;top:0;bottom:0;
+  background:repeating-linear-gradient(115deg,rgba(244,235,217,.13) 0 3px,transparent 3px 7px);
+}
+.tick{position:absolute;top:52px;width:1px;height:7px;background:var(--cream-faint)}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;background:transparent;
+  height:70px;margin:0;position:relative;z-index:2;cursor:grab;
+}
+input[type=range]:active{cursor:grabbing}
+input[type=range]::-webkit-slider-runnable-track{height:70px;background:transparent}
+input[type=range]::-moz-range-track{height:70px;background:transparent}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:40px;height:56px;border-radius:11px;margin-top:7px;
+  background:linear-gradient(180deg,#F7CB67,var(--brass) 55%,#B07F1E);
+  border:1px solid rgba(0,0,0,.3);
+  box-shadow:0 3px 8px rgba(0,0,0,.4),0 1px 0 rgba(255,255,255,.5) inset;
+}
+input[type=range]::-moz-range-thumb{
+  width:40px;height:56px;border-radius:11px;border:1px solid rgba(0,0,0,.3);
+  background:linear-gradient(180deg,#F7CB67,var(--brass) 55%,#B07F1E);
+  box-shadow:0 3px 8px rgba(0,0,0,.4);
+}
+.scale{display:flex;justify-content:space-between;font-size:.74rem;color:var(--cream-dim);padding:0 2px;margin-top:-6px}
+
+/* ---- parar ---- */
+#stop{
+  font-family:var(--font);font-size:1.3rem;font-weight:800;letter-spacing:.01em;color:#fff;
+  background:linear-gradient(180deg,#E34B3D,var(--signal));
+  border:none;border-radius:var(--radius);padding:20px;width:100%;cursor:pointer;
+  box-shadow:0 5px 0 var(--signal-lo),0 10px 18px rgba(0,0,0,.28);
+}
+#stop:active{transform:translateY(4px);box-shadow:0 1px 0 var(--signal-lo)}
+
+/* ---- secciones ---- */
+.group{display:flex;flex-direction:column;gap:10px}
+.group h2{font-size:.82rem;font-weight:600;color:var(--cream-dim)}
+.sounds{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.snd{
+  font-family:var(--font);font-size:.88rem;font-weight:600;color:var(--cream);
+  background:var(--panel-hi);border:1px solid rgba(255,255,255,.12);
+  border-radius:var(--radius);padding:14px 6px;cursor:pointer;
+  box-shadow:0 3px 0 rgba(0,0,0,.28);
+}
+.snd:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.28);background:var(--brass);color:var(--ink)}
+.lights{display:flex;flex-wrap:wrap;gap:10px}
+.sw{width:38px;height:38px;border-radius:50%;border:2px solid rgba(0,0,0,.3);cursor:pointer;padding:0;
+  box-shadow:0 2px 5px rgba(0,0,0,.3)}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 3px var(--cream),0 2px 6px rgba(0,0,0,.35)}
+.sw.off{background:var(--panel-lo);position:relative}
+.sw.off::after{content:"";position:absolute;inset:8px 2px;border-top:2px solid var(--cream-dim);transform:rotate(-45deg)}
+.ghost{
+  font-family:var(--font);font-size:.86rem;font-weight:500;color:var(--cream-dim);
+  background:none;border:1px solid var(--cream-faint);border-radius:var(--radius);
+  padding:12px;cursor:pointer;width:100%;
+}
+.ghost:active{background:rgba(0,0,0,.2)}
+.hidden{display:none !important}
+.disabled{opacity:.35;pointer-events:none}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+@media (max-width:340px){.sounds{grid-template-columns:repeat(2,1fr)}#speedNum{font-size:3.8rem}}
+</style>
+</head>
+<body>
+<main class="panel">
+
+  <div class="status">
+    <span class="lamp" id="lamp"></span>
+    <span id="statusText">Sin conectar</span>
+    <span id="battery"></span>
+  </div>
+
+  <section class="intro" id="intro">
+    <h1>Mando del tren</h1>
+    <p>Enciende el tren, pulsa conectar y elige <em>Train Base</em> en la lista.</p>
+    <button class="big-btn" id="connect">Conectar con el tren</button>
+  </section>
+
+  <section id="controls" class="hidden" style="display:flex;flex-direction:column;gap:18px">
+
+    <div>
+      <div class="readout">
+        <span class="chev" id="chevL">◀◀</span>
+        <span id="speedNum">0</span>
+        <span class="chev" id="chevR">▶▶</span>
+      </div>
+      <p class="caption" id="dirLabel">Parado</p>
+    </div>
+
+    <div class="throttle">
+      <div class="slot"></div>
+      <input type="range" id="throttle" min="-100" max="100" value="0" step="1"
+             aria-label="Velocidad y sentido de la marcha">
+      <div class="scale"><span>atrás</span><span>0</span><span>adelante</span></div>
+    </div>
+
+    <button id="stop">PARAR</button>
+
+    <div class="group">
+      <h2>Sonidos</h2>
+      <div class="sounds">
+        <button class="snd" data-sound="9">Silbato</button>
+        <button class="snd" data-sound="10">Vapor</button>
+        <button class="snd" data-sound="3">Frenada</button>
+        <button class="snd" data-sound="5">Salida</button>
+        <button class="snd" data-sound="7">Agua</button>
+        <button class="snd" data-sound="0">Silencio</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Luz</h2>
+      <div class="lights" id="lights"></div>
+    </div>
+
+    <button class="ghost" id="power">Apagar el tren</button>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const SERVICE = "00001623-1212-efde-1623-785feabcd123";
+  const CHAR    = "00001624-1212-efde-1623-785feabcd123";
+  const P_MOTOR = 0x00, P_SOUND = 0x01, P_LIGHT = 0x11;
+  const DEADZONE = 6;          // por debajo de esto el motor no mueve el tren
+  const SEND_MS  = 90;         // intervalo mínimo entre órdenes de velocidad
+
+  const $ = id => document.getElementById(id);
+  const lamp = $("lamp"), statusText = $("statusText"), battery = $("battery");
+  const intro = $("intro"), controls = $("controls");
+  const throttle = $("throttle"), speedNum = $("speedNum");
+  const chevL = $("chevL"), chevR = $("chevR"), dirLabel = $("dirLabel");
+
+  let device = null, characteristic = null, wakeLock = null;
+  let chain = Promise.resolve();
+  let lastSent = 0, pending = null, timer = null;
+
+  const COLOURS = [
+    {v:0,  name:"apagada",    css:null},
+    {v:1,  name:"rosa",       css:"#FF6FB5"},
+    {v:2,  name:"morado",     css:"#8B4FD6"},
+    {v:3,  name:"azul",       css:"#1B5BD6"},
+    {v:4,  name:"azul claro", css:"#4FA8E8"},
+    {v:5,  name:"turquesa",   css:"#3FD6CC"},
+    {v:6,  name:"verde",      css:"#2FB84A"},
+    {v:7,  name:"amarillo",   css:"#F5D020"},
+    {v:8,  name:"naranja",    css:"#F08018"},
+    {v:9,  name:"rojo",       css:"#E02A1F"},
+    {v:10, name:"blanco",     css:"#FFFFFF"}
+  ];
+
+  // ---------- estado visible ----------
+  function setStatus(text, state){
+    statusText.textContent = text;
+    lamp.className = "lamp" + (state ? " " + state : "");
+  }
+
+  function paintSpeed(v){
+    speedNum.textContent = Math.abs(v);
+    chevL.classList.toggle("lit", v < 0);
+    chevR.classList.toggle("lit", v > 0);
+    dirLabel.textContent = v === 0 ? "Parado" : (v > 0 ? "Hacia adelante" : "Marcha atrás");
+  }
+
+  // ---------- envío ----------
+  function write(bytes){
+    if (!characteristic) return Promise.resolve();
+    const data = new Uint8Array(bytes);
+    chain = chain.then(() => characteristic.writeValueWithoutResponse
+        ? characteristic.writeValueWithoutResponse(data)
+        : characteristic.writeValue(data))
+      .catch(err => { console.warn("Envío fallido:", err); });
+    return chain;
+  }
+
+  const motor = speed => write([0x08,0x00,0x81,P_MOTOR,0x11,0x51,0x00, speed & 0xff]);
+  const sound = id    => write([0x08,0x00,0x81,P_SOUND,0x11,0x51,0x01, id & 0xff]);
+  const light = col   => write([0x08,0x00,0x81,P_LIGHT,0x11,0x51,0x00, col & 0xff]);
+
+  // limita la frecuencia pero garantiza que el último valor siempre llega
+  function requestSpeed(v){
+    pending = v;
+    const now = Date.now();
+    const wait = Math.max(0, SEND_MS - (now - lastSent));
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      lastSent = Date.now();
+      motor(pending);
+    }, wait);
+  }
+
+  // ---------- conexión ----------
+  async function connect(){
+    if (!navigator.bluetooth){
+      setStatus("Este navegador no usa Bluetooth. Ábrelo en Chrome.", null);
+      return;
+    }
+    if (!window.isSecureContext){
+      setStatus("Hace falta HTTPS para usar Bluetooth.", null);
+      return;
+    }
+    try{
+      setStatus("Buscando el tren…", "busy");
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SERVICE] }],
+        optionalServices: [SERVICE]
+      });
+      device.addEventListener("gattserverdisconnected", onDisconnected);
+
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE);
+      characteristic = await service.getCharacteristic(CHAR);
+      await characteristic.startNotifications();
+      characteristic.addEventListener("characteristicvaluechanged", onMessage);
+
+      await write([0x05,0x00,0x01,0x06,0x02]);   // avisos de batería
+      await motor(0);
+
+      intro.classList.add("hidden");
+      controls.classList.remove("hidden");
+      setStatus(device.name || "Tren conectado", "on");
+      keepAwake();
+    }catch(err){
+      characteristic = null;
+      if (err && err.name === "NotFoundError"){
+        setStatus("No se eligió ningún tren. Enciéndelo y reintenta.", null);
+      }else{
+        setStatus("No se pudo conectar. Apaga y enciende el tren.", null);
+        console.error(err);
+      }
+    }
+  }
+
+  function onDisconnected(){
+    characteristic = null;
+    chain = Promise.resolve();
+    controls.classList.add("hidden");
+    intro.classList.remove("hidden");
+    battery.textContent = "";
+    throttle.value = 0; paintSpeed(0);
+    setStatus("Tren desconectado", null);
+    releaseWake();
+  }
+
+  function onMessage(ev){
+    const d = new Uint8Array(ev.target.value.buffer);
+    if (d.length >= 6 && d[2] === 0x01 && d[3] === 0x06 && d[4] === 0x06){
+      const pct = d[5];
+      battery.textContent = pct + "%";
+      battery.classList.toggle("low", pct < 20);
+    }
+  }
+
+  // ---------- pantalla encendida ----------
+  async function keepAwake(){
+    try{ if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); }
+    catch(_){}
+  }
+  function releaseWake(){ try{ wakeLock && wakeLock.release(); }catch(_){} wakeLock = null; }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && characteristic && !wakeLock) keepAwake();
+  });
+
+  // ---------- interacción ----------
+  $("connect").addEventListener("click", connect);
+
+  throttle.addEventListener("input", () => {
+    let v = parseInt(throttle.value, 10);
+    if (Math.abs(v) <= DEADZONE){ v = 0; throttle.value = 0; }
+    paintSpeed(v);
+    requestSpeed(v);
+  });
+
+  function fullStop(){
+    throttle.value = 0;
+    paintSpeed(0);
+    pending = 0;
+    clearTimeout(timer); timer = null; lastSent = Date.now();
+    motor(0);
+  }
+  $("stop").addEventListener("click", fullStop);
+
+  document.addEventListener("keydown", e => {
+    if ((e.code === "Space" || e.code === "Escape") && characteristic){
+      e.preventDefault(); fullStop();
+    }
+  });
+
+  document.querySelectorAll(".snd").forEach(b => {
+    b.addEventListener("click", () => sound(parseInt(b.dataset.sound, 10)));
+  });
+
+  const lights = $("lights");
+  COLOURS.forEach(c => {
+    const b = document.createElement("button");
+    b.className = "sw" + (c.css ? "" : " off");
+    if (c.css) b.style.background = c.css;
+    b.setAttribute("aria-label", "Luz " + c.name);
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => {
+      lights.querySelectorAll(".sw").forEach(x => x.setAttribute("aria-pressed","false"));
+      b.setAttribute("aria-pressed","true");
+      light(c.v);
+    });
+    lights.appendChild(b);
+  });
+
+  $("power").addEventListener("click", async () => {
+    await motor(0);
+    await write([0x04,0x00,0x02,0x01]);   // apagar el hub
+    setStatus("Apagando el tren…", "busy");
+  });
+
+  window.addEventListener("pagehide", () => { if (characteristic) motor(0); });
+
+  paintSpeed(0);
+})();
+</script>
+</body>
+</html>
