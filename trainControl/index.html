@@ -218,7 +218,7 @@ input[type=range]::-moz-range-thumb{
   </section>
 
   <div id="debugLog" style="font-family:monospace;font-size:.65rem;line-height:1.3;white-space:pre-wrap;max-height:160px;overflow-y:auto;background:rgba(0,0,0,.25);border-radius:8px;padding:6px 8px;margin-top:8px;opacity:.85;"></div>
-  <div style="text-align:center;font-size:.7rem;opacity:.4;margin-top:4px;">v003</div>
+  <div style="text-align:center;font-size:.7rem;opacity:.4;margin-top:4px;">v004</div>
 </main>
 
 <script>
@@ -230,6 +230,7 @@ input[type=range]::-moz-range-thumb{
   const P_MOTOR = 0x00, P_SOUND = 0x01, P_LIGHT = 0x11;
   const DEADZONE = 6;          // por debajo de esto el motor no mueve el tren
   const SEND_MS  = 90;         // intervalo mínimo entre órdenes de velocidad
+  const SOUND_GAP_MS = 150;    // pausa entre activar el modo SONIDO y reproducirlo
 
   const $ = id => document.getElementById(id);
   const lamp = $("lamp"), statusText = $("statusText"), battery = $("battery");
@@ -294,11 +295,16 @@ input[type=range]::-moz-range-thumb{
     return chain;
   }
 
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
   const motor = speed => write([0x08,0x00,0x81,P_MOTOR,0x11,0x51,0x00, speed & 0xff]);
   // El altavoz necesita activar primero el modo SONIDO (Port Input Format Setup, 0x41)
   // antes de que el WriteDirectModeData (0x51) surta efecto; motor y luz ya usan su modo por defecto.
-  const sound = id    => {
-    write([0x0A,0x00,0x41,P_SOUND,0x01,0x01,0x00,0x00,0x00,0x01]); // activa el modo SONIDO
+  const armSound = () => write([0x0A,0x00,0x41,P_SOUND,0x01,0x01,0x00,0x00,0x00,0x01]);
+  // Sin pausa los dos comandos caen en el mismo intervalo de conexión y el hub descarta el segundo
+  const sound = async id => {
+    await armSound();
+    await sleep(SOUND_GAP_MS);
     return write([0x08,0x00,0x81,P_SOUND,0x11,0x51,0x01, id & 0xff]); // reproduce el sonido
   };
   const light = col   => write([0x08,0x00,0x81,P_LIGHT,0x11,0x51,0x00, col & 0xff]);
@@ -341,6 +347,7 @@ input[type=range]::-moz-range-thumb{
       characteristic.addEventListener("characteristicvaluechanged", onMessage);
 
       await write([0x05,0x00,0x01,0x06,0x02]);   // avisos de batería
+      await armSound();                          // deja el modo SONIDO listo desde el principio
       await motor(0);
 
       intro.classList.add("hidden");
